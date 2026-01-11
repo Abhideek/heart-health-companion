@@ -16,14 +16,14 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const { login, user } = useAuth();
+  const { login, user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
+    if (!authLoading && user) {
       navigate(user.role === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard');
     }
-  }, [user, navigate]);
+  }, [user, navigate, authLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,17 +43,25 @@ const Login: React.FC = () => {
       return;
     }
 
-    const success = await login(email, password);
+    const result = await login(email, password);
     
-    if (success) {
+    if (result.success) {
       const role = email.endsWith('@hospital.com') ? 'doctor' : 'patient';
       navigate(role === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard');
     } else {
-      setError('Invalid credentials. Password must be at least 6 characters.');
+      setError(result.error || 'Invalid credentials. Please try again.');
     }
     
     setIsLoading(false);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="h-8 w-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center px-4 py-12">
@@ -97,7 +105,7 @@ const Login: React.FC = () => {
               <TabsContent value="doctor" className="mt-4">
                 <div className="p-3 rounded-lg bg-accent mb-4">
                   <p className="text-sm text-accent-foreground">
-                    <strong>Demo:</strong> Use any email ending with <code className="bg-primary/10 px-1 rounded">@hospital.com</code>
+                    Use your <code className="bg-primary/10 px-1 rounded">@hospital.com</code> email
                   </p>
                 </div>
               </TabsContent>
@@ -105,7 +113,7 @@ const Login: React.FC = () => {
               <TabsContent value="patient" className="mt-4">
                 <div className="p-3 rounded-lg bg-accent mb-4">
                   <p className="text-sm text-accent-foreground">
-                    <strong>Demo:</strong> Use any email NOT ending with @hospital.com
+                    Use your personal email address
                   </p>
                 </div>
               </TabsContent>

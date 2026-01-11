@@ -2,15 +2,18 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, FileText, Activity, Heart, Search, Plus, 
-  ChevronRight, CheckCircle, AlertTriangle, AlertCircle 
+  ChevronRight, CheckCircle, AlertTriangle, AlertCircle,
+  UserPlus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import Navbar from '@/components/Navbar';
 import { usePatientData, ClinicalData, Patient } from '@/contexts/PatientDataContext';
+import { useToast } from '@/hooks/use-toast';
 
 const initialClinicalData: ClinicalData = {
   age: 55,
@@ -29,13 +32,20 @@ const initialClinicalData: ClinicalData = {
 };
 
 const DoctorDashboard: React.FC = () => {
-  const { patients, addReport, publishReport, reports } = usePatientData();
+  const { patients, addReport, publishReport, addPatient, isLoading } = usePatientData();
+  const { toast } = useToast();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [clinicalData, setClinicalData] = useState<ClinicalData>(initialClinicalData);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<{ score: number; level: 'low' | 'medium' | 'high' } | null>(null);
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
+  
+  // Add patient form state
+  const [isAddingPatient, setIsAddingPatient] = useState(false);
+  const [newPatientName, setNewPatientName] = useState('');
+  const [newPatientEmail, setNewPatientEmail] = useState('');
+  const [newPatientAge, setNewPatientAge] = useState('');
 
   const filteredPatients = patients.filter(p => 
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -47,36 +57,17 @@ const DoctorDashboard: React.FC = () => {
   };
 
   const calculateRisk = (): { score: number; level: 'low' | 'medium' | 'high' } => {
-    // Simplified risk calculation based on key factors
     let riskScore = 0;
-    
-    // Age factor
     riskScore += clinicalData.age > 55 ? 15 : clinicalData.age > 45 ? 10 : 5;
-    
-    // Blood pressure
     riskScore += clinicalData.trestbps > 140 ? 20 : clinicalData.trestbps > 120 ? 10 : 0;
-    
-    // Cholesterol
     riskScore += clinicalData.chol > 240 ? 20 : clinicalData.chol > 200 ? 10 : 0;
-    
-    // Chest pain type
     riskScore += clinicalData.cp * 5;
-    
-    // Exercise induced angina
     riskScore += clinicalData.exang * 15;
-    
-    // Max heart rate (lower is worse)
     riskScore += clinicalData.thalach < 120 ? 15 : clinicalData.thalach < 150 ? 5 : 0;
-    
-    // ST depression
     riskScore += clinicalData.oldpeak * 5;
-    
-    // Number of major vessels
     riskScore += clinicalData.ca * 10;
     
-    // Normalize to 0-100
     const normalizedScore = Math.min(Math.round(riskScore), 100);
-    
     const level: 'low' | 'medium' | 'high' = 
       normalizedScore >= 60 ? 'high' : 
       normalizedScore >= 30 ? 'medium' : 'low';
@@ -130,12 +121,12 @@ const DoctorDashboard: React.FC = () => {
     setIsAnalyzing(true);
     setAnalysisResult(null);
     
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
     const result = calculateRisk();
     setAnalysisResult(result);
     
-    const report = {
+    const report = await addReport({
       patientId: selectedPatient.id,
       patientName: selectedPatient.name,
       patientEmail: selectedPatient.email,
@@ -144,23 +135,52 @@ const DoctorDashboard: React.FC = () => {
       riskLevel: result.level,
       dietPlan: generateDietPlan(result.level),
       recommendations: generateRecommendations(result.level),
-    };
+    });
     
-    addReport(report);
-    setCurrentReportId(Date.now().toString());
+    if (report) {
+      setCurrentReportId(report.id);
+      toast({
+        title: "Analysis Complete",
+        description: `Risk assessment saved for ${selectedPatient.name}`,
+      });
+    }
+    
     setIsAnalyzing(false);
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (currentReportId) {
-      const latestReport = reports.find(r => r.patientEmail === selectedPatient?.email && !r.publishedAt);
-      if (latestReport) {
-        publishReport(latestReport.id);
-        setAnalysisResult(null);
-        setSelectedPatient(null);
-        setClinicalData(initialClinicalData);
-        setCurrentReportId(null);
-      }
+      await publishReport(currentReportId);
+      toast({
+        title: "Report Published",
+        description: "Patient can now view their health report",
+        variant: "default",
+      });
+      setAnalysisResult(null);
+      setSelectedPatient(null);
+      setClinicalData(initialClinicalData);
+      setCurrentReportId(null);
+    }
+  };
+
+  const handleAddPatient = async () => {
+    if (!newPatientName || !newPatientEmail) return;
+    
+    const patient = await addPatient({
+      name: newPatientName,
+      email: newPatientEmail,
+      age: newPatientAge ? parseInt(newPatientAge) : undefined,
+    });
+    
+    if (patient) {
+      toast({
+        title: "Patient Added",
+        description: `${patient.name} has been added to your patient list`,
+      });
+      setNewPatientName('');
+      setNewPatientEmail('');
+      setNewPatientAge('');
+      setIsAddingPatient(false);
     }
   };
 
@@ -180,6 +200,17 @@ const DoctorDashboard: React.FC = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="flex items-center justify-center pt-32">
+          <div className="h-8 w-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -195,10 +226,55 @@ const DoctorDashboard: React.FC = () => {
             {/* Patient List */}
             <Card className="lg:col-span-1">
               <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Patients
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    Patients
+                  </CardTitle>
+                  <Dialog open={isAddingPatient} onOpenChange={setIsAddingPatient}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <UserPlus className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New Patient</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Name</label>
+                          <Input
+                            placeholder="Patient name"
+                            value={newPatientName}
+                            onChange={(e) => setNewPatientName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Email</label>
+                          <Input
+                            type="email"
+                            placeholder="patient@email.com"
+                            value={newPatientEmail}
+                            onChange={(e) => setNewPatientEmail(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Age (optional)</label>
+                          <Input
+                            type="number"
+                            placeholder="45"
+                            value={newPatientAge}
+                            onChange={(e) => setNewPatientAge(e.target.value)}
+                          />
+                        </div>
+                        <Button onClick={handleAddPatient} className="w-full">
+                          Add Patient
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
                 <div className="relative mt-2">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -212,38 +288,49 @@ const DoctorDashboard: React.FC = () => {
               <CardContent>
                 <ScrollArea className="h-[400px]">
                   <div className="space-y-2">
-                    {filteredPatients.map((patient) => (
-                      <motion.button
-                        key={patient.id}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          setSelectedPatient(patient);
-                          setAnalysisResult(null);
-                        }}
-                        className={`w-full p-3 rounded-lg text-left transition-colors ${
-                          selectedPatient?.id === patient.id
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted hover:bg-accent'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{patient.name}</p>
-                            <p className={`text-sm ${selectedPatient?.id === patient.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                              Age: {patient.age} • {patient.email}
-                            </p>
+                    {filteredPatients.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>No patients yet</p>
+                        <p className="text-sm">Add your first patient to get started</p>
+                      </div>
+                    ) : (
+                      filteredPatients.map((patient) => (
+                        <motion.button
+                          key={patient.id}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setSelectedPatient(patient);
+                            setAnalysisResult(null);
+                            if (patient.age) {
+                              setClinicalData(prev => ({ ...prev, age: patient.age! }));
+                            }
+                          }}
+                          className={`w-full p-3 rounded-lg text-left transition-colors ${
+                            selectedPatient?.id === patient.id
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted hover:bg-accent'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{patient.name}</p>
+                              <p className={`text-sm ${selectedPatient?.id === patient.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                                {patient.age ? `Age: ${patient.age} • ` : ''}{patient.email}
+                              </p>
+                            </div>
+                            <ChevronRight className="h-4 w-4" />
                           </div>
-                          <ChevronRight className="h-4 w-4" />
-                        </div>
-                        {patient.riskLevel && (
-                          <div className={`mt-2 flex items-center gap-1 text-xs capitalize ${selectedPatient?.id === patient.id ? '' : getRiskColor(patient.riskLevel)}`}>
-                            {getRiskIcon(patient.riskLevel)}
-                            {patient.riskLevel} Risk
-                          </div>
-                        )}
-                      </motion.button>
-                    ))}
+                          {patient.riskLevel && (
+                            <div className={`mt-2 flex items-center gap-1 text-xs capitalize ${selectedPatient?.id === patient.id ? '' : getRiskColor(patient.riskLevel)}`}>
+                              {getRiskIcon(patient.riskLevel)}
+                              {patient.riskLevel} Risk
+                            </div>
+                          )}
+                        </motion.button>
+                      ))
+                    )}
                   </div>
                 </ScrollArea>
               </CardContent>
