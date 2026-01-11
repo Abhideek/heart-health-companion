@@ -14,16 +14,221 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clinical_reports: {
+        Row: {
+          age: number
+          ca: number
+          chol: number
+          cp: number
+          created_at: string
+          diet_plan: string | null
+          doctor_id: string
+          exang: number
+          fbs: number
+          id: string
+          is_published: boolean
+          oldpeak: number
+          patient_email: string
+          patient_id: string
+          patient_name: string
+          published_at: string | null
+          recommendations: string[] | null
+          restecg: number
+          risk_level: string
+          risk_score: number
+          sex: number
+          slope: number
+          thal: number
+          thalach: number
+          trestbps: number
+        }
+        Insert: {
+          age: number
+          ca: number
+          chol: number
+          cp: number
+          created_at?: string
+          diet_plan?: string | null
+          doctor_id: string
+          exang: number
+          fbs: number
+          id?: string
+          is_published?: boolean
+          oldpeak: number
+          patient_email: string
+          patient_id: string
+          patient_name: string
+          published_at?: string | null
+          recommendations?: string[] | null
+          restecg: number
+          risk_level: string
+          risk_score: number
+          sex: number
+          slope: number
+          thal: number
+          thalach: number
+          trestbps: number
+        }
+        Update: {
+          age?: number
+          ca?: number
+          chol?: number
+          cp?: number
+          created_at?: string
+          diet_plan?: string | null
+          doctor_id?: string
+          exang?: number
+          fbs?: number
+          id?: string
+          is_published?: boolean
+          oldpeak?: number
+          patient_email?: string
+          patient_id?: string
+          patient_name?: string
+          published_at?: string | null
+          recommendations?: string[] | null
+          restecg?: number
+          risk_level?: string
+          risk_score?: number
+          sex?: number
+          slope?: number
+          thal?: number
+          thalach?: number
+          trestbps?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinical_reports_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinical_reports_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patients: {
+        Row: {
+          age: number | null
+          created_at: string
+          doctor_id: string
+          email: string
+          id: string
+          last_visit: string | null
+          name: string
+          patient_user_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          age?: number | null
+          created_at?: string
+          doctor_id: string
+          email: string
+          id?: string
+          last_visit?: string | null
+          name: string
+          patient_user_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          age?: number | null
+          created_at?: string
+          doctor_id?: string
+          email?: string
+          id?: string
+          last_visit?: string | null
+          name?: string
+          patient_user_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patients_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patients_patient_user_id_fkey"
+            columns: ["patient_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: { required_role: Database["public"]["Enums"]["app_role"] }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "doctor" | "patient"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +355,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["doctor", "patient"],
+    },
   },
 } as const

@@ -17,14 +17,14 @@ const Signup: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const { signup, user } = useAuth();
+  const { signup, user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
+    if (!authLoading && user) {
       navigate(user.role === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard');
     }
-  }, [user, navigate]);
+  }, [user, navigate, authLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,17 +46,25 @@ const Signup: React.FC = () => {
     }
 
     setIsLoading(true);
-    const success = await signup(email, name, password);
+    const result = await signup(email, name, password);
     
-    if (success) {
+    if (result.success) {
       const role = email.endsWith('@hospital.com') ? 'doctor' : 'patient';
       navigate(role === 'doctor' ? '/doctor-dashboard' : '/patient-dashboard');
     } else {
-      setError('Failed to create account. Please try again.');
+      setError(result.error || 'Failed to create account. Please try again.');
     }
     
     setIsLoading(false);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="h-8 w-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center px-4 py-12">
