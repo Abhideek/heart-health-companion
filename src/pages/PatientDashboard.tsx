@@ -131,15 +131,68 @@ const PatientDashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 rounded-xl bg-muted">
-                          <p className="text-sm text-muted-foreground">Blood Pressure</p>
-                          <p className="text-xl font-semibold">{latestReport.clinicalData.trestbps} mmHg</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="p-3 rounded-xl bg-muted">
+                          <p className="text-xs text-muted-foreground">Blood Pressure</p>
+                          <p className="text-lg font-semibold">{latestReport.clinicalData.trestbps} <span className="text-xs font-normal">mmHg</span></p>
                         </div>
-                        <div className="p-4 rounded-xl bg-muted">
-                          <p className="text-sm text-muted-foreground">Cholesterol</p>
-                          <p className="text-xl font-semibold">{latestReport.clinicalData.chol} mg/dl</p>
+                        <div className="p-3 rounded-xl bg-muted">
+                          <p className="text-xs text-muted-foreground">Cholesterol</p>
+                          <p className="text-lg font-semibold">{latestReport.clinicalData.chol} <span className="text-xs font-normal">mg/dl</span></p>
                         </div>
+                        <div className="p-3 rounded-xl bg-muted">
+                          <p className="text-xs text-muted-foreground">Max Heart Rate</p>
+                          <p className="text-lg font-semibold">{latestReport.clinicalData.thalach} <span className="text-xs font-normal">bpm</span></p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-muted">
+                          <p className="text-xs text-muted-foreground">Age</p>
+                          <p className="text-lg font-semibold">{latestReport.clinicalData.age} <span className="text-xs font-normal">years</span></p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Full Clinical Data */}
+                  <div className="mt-6 p-4 rounded-xl bg-muted/50">
+                    <h4 className="font-semibold text-foreground mb-4">Complete Clinical Data from Doctor</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Sex</p>
+                        <p className="font-medium">{latestReport.clinicalData.sex === 1 ? 'Male' : 'Female'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Chest Pain Type</p>
+                        <p className="font-medium">
+                          {['Typical Angina', 'Atypical Angina', 'Non-anginal', 'Asymptomatic'][latestReport.clinicalData.cp]}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Fasting Blood Sugar</p>
+                        <p className="font-medium">{latestReport.clinicalData.fbs === 1 ? '> 120 mg/dl' : '≤ 120 mg/dl'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Resting ECG</p>
+                        <p className="font-medium">
+                          {['Normal', 'ST-T Abnormality', 'LV Hypertrophy'][latestReport.clinicalData.restecg]}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Exercise Angina</p>
+                        <p className="font-medium">{latestReport.clinicalData.exang === 1 ? 'Yes' : 'No'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">ST Depression</p>
+                        <p className="font-medium">{latestReport.clinicalData.oldpeak.toFixed(1)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Slope</p>
+                        <p className="font-medium">
+                          {['Upsloping', 'Flat', 'Downsloping'][latestReport.clinicalData.slope]}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Major Vessels</p>
+                        <p className="font-medium">{latestReport.clinicalData.ca}</p>
                       </div>
                     </div>
                   </div>
