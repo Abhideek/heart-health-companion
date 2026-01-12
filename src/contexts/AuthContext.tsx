@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { linkPatientAccount } from '@/lib/patientLinking';
 import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
 export type UserRole = 'doctor' | 'patient' | null;
@@ -124,6 +125,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.user) {
         // Wait a moment for the trigger to create profile and role
         await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // If patient, try to link existing patient records
+        const isPatient = !email.endsWith('@hospital.com');
+        if (isPatient) {
+          const linkResult = await linkPatientAccount(data.user.id, email);
+          if (linkResult.linked) {
+            console.log(`Linked ${linkResult.count} patient record(s) to account`);
+          }
+        }
+        
         await fetchUserData(data.user);
       }
 
