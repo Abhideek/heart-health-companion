@@ -14,6 +14,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import Navbar from '@/components/Navbar';
 import { usePatientData, ClinicalData, Patient } from '@/contexts/PatientDataContext';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  clinicalDataRanges, 
+  parseNumericInput, 
+  validateClinicalData 
+} from '@/lib/clinicalDataValidation';
 
 const initialClinicalData: ClinicalData = {
   age: 55,
@@ -53,6 +58,25 @@ const DoctorDashboard: React.FC = () => {
   );
 
   const handleInputChange = (field: keyof ClinicalData, value: number) => {
+    setClinicalData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Validated input handler for numeric fields with range checking
+  const handleValidatedInputChange = (
+    field: keyof typeof clinicalDataRanges,
+    rawValue: string,
+    isFloat: boolean = false
+  ) => {
+    const { value, error } = parseNumericInput(rawValue, field, isFloat);
+    
+    if (error) {
+      toast({
+        title: "Invalid Input",
+        description: error,
+        variant: "destructive",
+      });
+    }
+    
     setClinicalData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -117,6 +141,17 @@ const DoctorDashboard: React.FC = () => {
 
   const handleAnalyze = async () => {
     if (!selectedPatient) return;
+    
+    // Validate all clinical data before analysis
+    const validation = validateClinicalData(clinicalData);
+    if (!validation.valid) {
+      toast({
+        title: "Validation Error",
+        description: validation.errors[0] || "Please check clinical data values",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsAnalyzing(true);
     setAnalysisResult(null);
@@ -354,11 +389,13 @@ const DoctorDashboard: React.FC = () => {
                   <div className="space-y-6">
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Age</label>
+                        <label className="text-sm font-medium">Age (0-120)</label>
                         <Input
                           type="number"
+                          min={clinicalDataRanges.age.min}
+                          max={clinicalDataRanges.age.max}
                           value={clinicalData.age}
-                          onChange={(e) => handleInputChange('age', parseInt(e.target.value) || 0)}
+                          onChange={(e) => handleValidatedInputChange('age', e.target.value)}
                         />
                       </div>
                       
@@ -397,20 +434,24 @@ const DoctorDashboard: React.FC = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Resting BP (mmHg)</label>
+                        <label className="text-sm font-medium">Resting BP ({clinicalDataRanges.trestbps.min}-{clinicalDataRanges.trestbps.max} mmHg)</label>
                         <Input
                           type="number"
+                          min={clinicalDataRanges.trestbps.min}
+                          max={clinicalDataRanges.trestbps.max}
                           value={clinicalData.trestbps}
-                          onChange={(e) => handleInputChange('trestbps', parseInt(e.target.value) || 0)}
+                          onChange={(e) => handleValidatedInputChange('trestbps', e.target.value)}
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Cholesterol (mg/dl)</label>
+                        <label className="text-sm font-medium">Cholesterol ({clinicalDataRanges.chol.min}-{clinicalDataRanges.chol.max} mg/dl)</label>
                         <Input
                           type="number"
+                          min={clinicalDataRanges.chol.min}
+                          max={clinicalDataRanges.chol.max}
                           value={clinicalData.chol}
-                          onChange={(e) => handleInputChange('chol', parseInt(e.target.value) || 0)}
+                          onChange={(e) => handleValidatedInputChange('chol', e.target.value)}
                         />
                       </div>
 
@@ -448,11 +489,13 @@ const DoctorDashboard: React.FC = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Max Heart Rate</label>
+                        <label className="text-sm font-medium">Max Heart Rate ({clinicalDataRanges.thalach.min}-{clinicalDataRanges.thalach.max})</label>
                         <Input
                           type="number"
+                          min={clinicalDataRanges.thalach.min}
+                          max={clinicalDataRanges.thalach.max}
                           value={clinicalData.thalach}
-                          onChange={(e) => handleInputChange('thalach', parseInt(e.target.value) || 0)}
+                          onChange={(e) => handleValidatedInputChange('thalach', e.target.value)}
                         />
                       </div>
 
@@ -473,12 +516,14 @@ const DoctorDashboard: React.FC = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">ST Depression (Oldpeak)</label>
+                        <label className="text-sm font-medium">ST Depression ({clinicalDataRanges.oldpeak.min}-{clinicalDataRanges.oldpeak.max})</label>
                         <Input
                           type="number"
                           step="0.1"
+                          min={clinicalDataRanges.oldpeak.min}
+                          max={clinicalDataRanges.oldpeak.max}
                           value={clinicalData.oldpeak}
-                          onChange={(e) => handleInputChange('oldpeak', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => handleValidatedInputChange('oldpeak', e.target.value, true)}
                         />
                       </div>
 
