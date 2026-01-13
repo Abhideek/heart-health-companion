@@ -15,8 +15,8 @@ export async function linkPatientAccount(userId: string, email: string): Promise
     // Use the secure database function to link patient records
     // This function runs with SECURITY DEFINER to bypass RLS
     const { data, error } = await supabase.rpc('link_patient_account', {
-      p_user_id: userId,
-      p_email: email
+      p_email: email,
+      p_user_id: userId
     });
 
     if (error) {
