@@ -106,55 +106,78 @@ export const PatientDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (!user) return;
 
     try {
-      let query = supabase
-        .from('clinical_reports')
-        .select('*')
-        .order('created_at', { ascending: false });
-
       if (user.role === 'doctor') {
-        query = query.eq('doctor_id', user.id);
+        // Doctors see all their reports
+        const { data, error } = await supabase
+          .from('clinical_reports')
+          .select('*')
+          .eq('doctor_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setReports(mapReportsData(data || []));
       } else {
-        // Patients see only published reports
-        query = query.eq('patient_email', user.email).eq('is_published', true);
+        // Patients: First get their linked patient IDs
+        const { data: patientRecords, error: patientError } = await supabase
+          .from('patients')
+          .select('id')
+          .eq('patient_user_id', user.id);
+
+        if (patientError) throw patientError;
+
+        if (patientRecords && patientRecords.length > 0) {
+          const patientIds = patientRecords.map(p => p.id);
+          
+          // Fetch published reports for all linked patient records
+          const { data: reports, error: reportsError } = await supabase
+            .from('clinical_reports')
+            .select('*')
+            .in('patient_id', patientIds)
+            .eq('is_published', true)
+            .order('created_at', { ascending: false });
+
+          if (reportsError) throw reportsError;
+          setReports(mapReportsData(reports || []));
+        } else {
+          // No linked patient records found
+          setReports([]);
+        }
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const mappedReports: PatientReport[] = (data || []).map((r) => ({
-        id: r.id,
-        patientId: r.patient_id,
-        patientName: r.patient_name,
-        patientEmail: r.patient_email,
-        clinicalData: {
-          age: r.age,
-          sex: r.sex,
-          cp: r.cp,
-          trestbps: r.trestbps,
-          chol: r.chol,
-          fbs: r.fbs,
-          restecg: r.restecg,
-          thalach: r.thalach,
-          exang: r.exang,
-          oldpeak: Number(r.oldpeak),
-          slope: r.slope,
-          ca: r.ca,
-          thal: r.thal,
-        },
-        riskScore: r.risk_score,
-        riskLevel: r.risk_level as 'low' | 'medium' | 'high',
-        dietPlan: r.diet_plan || '',
-        recommendations: r.recommendations || [],
-        createdAt: r.created_at,
-        publishedAt: r.published_at || undefined,
-      }));
-
-      setReports(mappedReports);
     } catch (error) {
       console.error('Error fetching reports:', error);
     }
   }, [user]);
+
+  // Helper function to map database reports to PatientReport interface
+  const mapReportsData = (data: any[]): PatientReport[] => {
+    return data.map((r) => ({
+      id: r.id,
+      patientId: r.patient_id,
+      patientName: r.patient_name,
+      patientEmail: r.patient_email,
+      clinicalData: {
+        age: r.age,
+        sex: r.sex,
+        cp: r.cp,
+        trestbps: r.trestbps,
+        chol: r.chol,
+        fbs: r.fbs,
+        restecg: r.restecg,
+        thalach: r.thalach,
+        exang: r.exang,
+        oldpeak: Number(r.oldpeak),
+        slope: r.slope,
+        ca: r.ca,
+        thal: r.thal,
+      },
+      riskScore: r.risk_score,
+      riskLevel: r.risk_level as 'low' | 'medium' | 'high',
+      dietPlan: r.diet_plan || '',
+      recommendations: r.recommendations || [],
+      createdAt: r.created_at,
+      publishedAt: r.published_at || undefined,
+    }));
+  };
 
   const refreshData = useCallback(async () => {
     setIsLoading(true);

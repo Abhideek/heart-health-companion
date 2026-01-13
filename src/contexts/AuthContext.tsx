@@ -97,6 +97,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       if (data.user) {
+        // Try to link patient records on login (in case they weren't linked during signup)
+        const isPatient = !email.endsWith('@hospital.com');
+        if (isPatient) {
+          const linkResult = await linkPatientAccount(data.user.id, email);
+          if (linkResult.linked) {
+            console.log(`Linked ${linkResult.count} patient record(s) to account on login`);
+          }
+        }
+        
         await fetchUserData(data.user);
       }
 

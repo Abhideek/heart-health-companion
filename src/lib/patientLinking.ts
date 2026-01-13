@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
  * Links a patient user account to existing patient records.
  * Called when a patient signs up - if their email matches any patient records
  * created by doctors, those records are linked to the new user account.
+ * Uses a secure database function to bypass RLS restrictions.
  */
 export async function linkPatientAccount(userId: string, email: string): Promise<{
   linked: boolean;
@@ -11,35 +12,27 @@ export async function linkPatientAccount(userId: string, email: string): Promise
   error?: string;
 }> {
   try {
-    // Find patient records matching this email that aren't already linked
-    const { data: patients, error: fetchError } = await supabase
-      .from('patients')
-      .select('id, name, doctor_id')
-      .eq('email', email.toLowerCase())
-      .is('patient_user_id', null);
+    // Use the secure database function to link patient records
+    // This function runs with SECURITY DEFINER to bypass RLS
+    const { data, error } = await supabase.rpc('link_patient_account', {
+      p_user_id: userId,
+      p_email: email
+    });
 
-    if (fetchError) {
-      console.error('Error fetching patient records:', fetchError);
-      return { linked: false, count: 0, error: fetchError.message };
+    if (error) {
+      console.error('Error linking patient records:', error);
+      return { linked: false, count: 0, error: error.message };
     }
 
-    if (!patients || patients.length === 0) {
-      return { linked: false, count: 0 };
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const result = data as { linked?: boolean; count?: number };
+      return { 
+        linked: result.linked || false, 
+        count: result.count || 0 
+      };
     }
 
-    // Link all matching patient records to this user
-    const { error: updateError } = await supabase
-      .from('patients')
-      .update({ patient_user_id: userId })
-      .eq('email', email.toLowerCase())
-      .is('patient_user_id', null);
-
-    if (updateError) {
-      console.error('Error linking patient records:', updateError);
-      return { linked: false, count: 0, error: updateError.message };
-    }
-
-    return { linked: true, count: patients.length };
+    return { linked: false, count: 0 };
   } catch (error) {
     console.error('Error in linkPatientAccount:', error);
     return { linked: false, count: 0, error: 'Unexpected error linking account' };
