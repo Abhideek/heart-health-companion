@@ -55,13 +55,8 @@ const Login: React.FC = () => {
     setIsLoading(false);
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
-        <div className="h-8 w-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // Don't show loading spinner for the login page - let users see the form immediately
+  // The redirect logic in useEffect will handle already-authenticated users once loading completes
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center px-4 py-12">
