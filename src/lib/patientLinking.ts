@@ -6,17 +6,16 @@ import { supabase } from '@/integrations/supabase/client';
  * created by doctors, those records are linked to the new user account.
  * Uses a secure database function to bypass RLS restrictions.
  */
-export async function linkPatientAccount(userId: string, email: string): Promise<{
+export async function linkPatientAccount(email: string): Promise<{
   linked: boolean;
   count: number;
   error?: string;
 }> {
   try {
     // Use the secure database function to link patient records
-    // This function runs with SECURITY DEFINER to bypass RLS
+    // This function uses auth.uid() internally for security - no user_id parameter needed
     const { data, error } = await supabase.rpc('link_patient_account', {
-      p_email: email,
-      p_user_id: userId
+      p_email: email
     });
 
     if (error) {

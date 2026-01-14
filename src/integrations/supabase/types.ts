@@ -226,10 +226,7 @@ export type Database = {
         Args: { required_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
       }
-      link_patient_account: {
-        Args: { p_email: string; p_user_id: string }
-        Returns: Json
-      }
+      link_patient_account: { Args: { p_email: string }; Returns: Json }
     }
     Enums: {
       app_role: "doctor" | "patient"
