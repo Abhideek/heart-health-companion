@@ -100,7 +100,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Try to link patient records on login (in case they weren't linked during signup)
         const isPatient = !email.endsWith('@hospital.com');
         if (isPatient) {
-          const linkResult = await linkPatientAccount(data.user.id, email);
+          const linkResult = await linkPatientAccount(email);
           if (linkResult.linked) {
             console.log(`Linked ${linkResult.count} patient record(s) to account on login`);
           }
@@ -138,7 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // If patient, try to link existing patient records
         const isPatient = !email.endsWith('@hospital.com');
         if (isPatient) {
-          const linkResult = await linkPatientAccount(data.user.id, email);
+          const linkResult = await linkPatientAccount(email);
           if (linkResult.linked) {
             console.log(`Linked ${linkResult.count} patient record(s) to account`);
           }
