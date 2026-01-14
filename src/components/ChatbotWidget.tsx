@@ -4,6 +4,9 @@ import { MessageCircle, X, Send, Bot, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface Message {
   id: string;
@@ -12,41 +15,9 @@ interface Message {
   timestamp: Date;
 }
 
-const getBotResponse = (userMessage: string): string => {
-  const lowerMessage = userMessage.toLowerCase();
-  
-  if (lowerMessage.includes('login') || lowerMessage.includes('sign in')) {
-    return "You can login using the Doctor or Patient buttons on the home page. Doctors should use emails ending with @hospital.com, while patients can use any other email.";
-  }
-  
-  if (lowerMessage.includes('diet') || lowerMessage.includes('food') || lowerMessage.includes('eat')) {
-    return "Your personalized diet plan is generated based on your heart risk analysis. High-risk patients receive a low-sodium DASH diet recommendation, while low-risk patients get a balanced maintenance diet plan.";
-  }
-  
-  if (lowerMessage.includes('risk') || lowerMessage.includes('score')) {
-    return "Your heart health risk score is calculated using AI analysis of clinical data including blood pressure, cholesterol levels, and other cardiac markers. The score ranges from 0-100, with higher scores indicating higher risk.";
-  }
-  
-  if (lowerMessage.includes('report') || lowerMessage.includes('download')) {
-    return "You can download your medical report as a PDF from your Patient Dashboard. The report includes your complete risk analysis, clinical data, and personalized recommendations.";
-  }
-  
-  if (lowerMessage.includes('doctor') || lowerMessage.includes('appointment')) {
-    return "To connect with a doctor, please visit your Patient Dashboard. Your assigned healthcare provider will review your clinical data and publish reports with personalized recommendations.";
-  }
-  
-  if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
-    return "Hello! 👋 I'm your CardioCare AI Assistant. I can help you with questions about login, your health reports, diet plans, and navigating the platform. How can I assist you today?";
-  }
-  
-  if (lowerMessage.includes('help')) {
-    return "I can help you with: \n• Login and account questions\n• Understanding your risk score\n• Diet plan information\n• Downloading reports\n• Connecting with doctors\n\nWhat would you like to know more about?";
-  }
-  
-  return "I'm analyzing your query with our medical database. For specific medical advice, please consult with your healthcare provider through the dashboard. Is there anything else I can help you with?";
-};
-
 const ChatbotWidget: React.FC = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(() => {
     const stored = localStorage.getItem('cardiocare_chat');
@@ -58,7 +29,7 @@ const ChatbotWidget: React.FC = () => {
     }
     return [{
       id: '1',
-      text: "Hello! I'm your CardioCare AI Assistant. How can I help you today?",
+      text: "Hello! I'm your CardioCare AI Assistant. I can help you with heart health questions, diet advice, and navigating the platform. How can I assist you today?",
       isBot: true,
       timestamp: new Date()
     }];
@@ -78,7 +49,7 @@ const ChatbotWidget: React.FC = () => {
   }, [messages, isTyping]);
 
   const handleSend = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isTyping) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -88,20 +59,69 @@ const ChatbotWidget: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const messageToSend = inputValue;
     setInputValue('');
     setIsTyping(true);
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      // Build chat history for context
+      const chatHistory = messages.slice(-10).map(m => ({
+        role: m.isBot ? 'assistant' : 'user',
+        content: m.text
+      }));
 
-    const botResponse: Message = {
-      id: (Date.now() + 1).toString(),
-      text: getBotResponse(inputValue),
-      isBot: true,
-      timestamp: new Date()
-    };
+      // Call the chat edge function
+      const { data, error } = await supabase.functions.invoke('chat', {
+        body: {
+          message: messageToSend,
+          role: user?.role || 'patient',
+          chatHistory
+        }
+      });
 
-    setIsTyping(false);
-    setMessages(prev => [...prev, botResponse]);
+      if (error) {
+        console.error('Chat error:', error);
+        throw new Error(error.message || 'Failed to get response');
+      }
+
+      const botResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        text: data?.reply || "I'm sorry, I couldn't process your request. Please try again.",
+        isBot: true,
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, botResponse]);
+    } catch (error) {
+      console.error('Chat error:', error);
+      
+      // Show toast for rate limit or payment errors
+      if (error instanceof Error) {
+        if (error.message.includes('429') || error.message.includes('busy')) {
+          toast({
+            title: "Service Busy",
+            description: "The AI service is currently busy. Please try again in a moment.",
+            variant: "destructive",
+          });
+        } else if (error.message.includes('402') || error.message.includes('credits')) {
+          toast({
+            title: "Service Unavailable",
+            description: "AI service credits exhausted. Please contact support.",
+            variant: "destructive",
+          });
+        }
+      }
+
+      const errorResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "I'm having trouble connecting right now. Please try again in a moment.",
+        isBot: true,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorResponse]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -152,8 +172,10 @@ const ChatbotWidget: React.FC = () => {
                   <Bot className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-primary-foreground">CardioCare Assistant</h3>
-                  <p className="text-xs text-primary-foreground/80">AI Health Support</p>
+                  <h3 className="font-semibold text-primary-foreground">CardioCare AI</h3>
+                  <p className="text-xs text-primary-foreground/80">
+                    {user?.role === 'doctor' ? 'Clinical Assistant' : 'Health Assistant'}
+                  </p>
                 </div>
               </div>
               <Button
@@ -215,8 +237,9 @@ const ChatbotWidget: React.FC = () => {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
+                  placeholder="Ask about heart health..."
                   className="flex-1"
+                  disabled={isTyping}
                 />
                 <Button
                   onClick={handleSend}

@@ -19,6 +19,11 @@ import {
   parseNumericInput, 
   validateClinicalData 
 } from '@/lib/clinicalDataValidation';
+import { 
+  predictHeartDisease, 
+  generateDietPlan, 
+  generateRecommendations 
+} from '@/lib/heartPrediction';
 
 const initialClinicalData: ClinicalData = {
   age: 55,
@@ -80,64 +85,8 @@ const DoctorDashboard: React.FC = () => {
     setClinicalData(prev => ({ ...prev, [field]: value }));
   };
 
-  const calculateRisk = (): { score: number; level: 'low' | 'medium' | 'high' } => {
-    let riskScore = 0;
-    riskScore += clinicalData.age > 55 ? 15 : clinicalData.age > 45 ? 10 : 5;
-    riskScore += clinicalData.trestbps > 140 ? 20 : clinicalData.trestbps > 120 ? 10 : 0;
-    riskScore += clinicalData.chol > 240 ? 20 : clinicalData.chol > 200 ? 10 : 0;
-    riskScore += clinicalData.cp * 5;
-    riskScore += clinicalData.exang * 15;
-    riskScore += clinicalData.thalach < 120 ? 15 : clinicalData.thalach < 150 ? 5 : 0;
-    riskScore += clinicalData.oldpeak * 5;
-    riskScore += clinicalData.ca * 10;
-    
-    const normalizedScore = Math.min(Math.round(riskScore), 100);
-    const level: 'low' | 'medium' | 'high' = 
-      normalizedScore >= 60 ? 'high' : 
-      normalizedScore >= 30 ? 'medium' : 'low';
-    
-    return { score: normalizedScore, level };
-  };
-
-  const generateDietPlan = (level: 'low' | 'medium' | 'high'): string => {
-    switch (level) {
-      case 'high':
-        return "DASH Diet - Low Sodium: Focus on fruits, vegetables, whole grains. Limit sodium to 1,500mg daily. Avoid processed foods, red meat, and sugary beverages. Include omega-3 rich fish 2-3 times per week.";
-      case 'medium':
-        return "Mediterranean Diet Modified: Emphasize whole grains, legumes, and healthy fats. Moderate sodium (2,000mg daily). Include regular physical activity. Limit alcohol and processed foods.";
-      default:
-        return "Balanced Maintenance Diet: Continue heart-healthy eating habits. Maintain regular exercise. Annual checkups recommended. Focus on variety of fruits, vegetables, lean proteins.";
-    }
-  };
-
-  const generateRecommendations = (level: 'low' | 'medium' | 'high'): string[] => {
-    const base = [
-      "Schedule follow-up in 6 months",
-      "Continue monitoring blood pressure",
-      "Maintain healthy weight"
-    ];
-    
-    if (level === 'high') {
-      return [
-        "Urgent: Schedule cardiology consultation",
-        "Start cardiac rehabilitation program",
-        "Daily blood pressure monitoring required",
-        "Consider stress testing",
-        ...base
-      ];
-    }
-    
-    if (level === 'medium') {
-      return [
-        "Lifestyle modifications recommended",
-        "Consider starting statin therapy",
-        "Increase physical activity to 150min/week",
-        ...base
-      ];
-    }
-    
-    return base;
-  };
+  // Remove the local calculateRisk, generateDietPlan, generateRecommendations functions
+  // These are now imported from heartPrediction.ts
 
   const handleAnalyze = async () => {
     if (!selectedPatient) return;
@@ -156,31 +105,43 @@ const DoctorDashboard: React.FC = () => {
     setIsAnalyzing(true);
     setAnalysisResult(null);
     
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const result = calculateRisk();
-    setAnalysisResult(result);
-    
-    const report = await addReport({
-      patientId: selectedPatient.id,
-      patientName: selectedPatient.name,
-      patientEmail: selectedPatient.email,
-      clinicalData,
-      riskScore: result.score,
-      riskLevel: result.level,
-      dietPlan: generateDietPlan(result.level),
-      recommendations: generateRecommendations(result.level),
-    });
-    
-    if (report) {
-      setCurrentReportId(report.id);
-      toast({
-        title: "Analysis Complete",
-        description: `Risk assessment saved for ${selectedPatient.name}`,
+    try {
+      // Call the prediction edge function
+      const prediction = await predictHeartDisease(clinicalData);
+      
+      const riskScore = Math.round(prediction.risk_percentage * 100);
+      const riskLevel = prediction.risk_level;
+      
+      setAnalysisResult({ score: riskScore, level: riskLevel });
+      
+      const report = await addReport({
+        patientId: selectedPatient.id,
+        patientName: selectedPatient.name,
+        patientEmail: selectedPatient.email,
+        clinicalData,
+        riskScore: riskScore,
+        riskLevel: riskLevel,
+        dietPlan: generateDietPlan(riskLevel),
+        recommendations: generateRecommendations(riskLevel),
       });
+      
+      if (report) {
+        setCurrentReportId(report.id);
+        toast({
+          title: "AI Analysis Complete",
+          description: `Risk assessment: ${prediction.prediction_text}`,
+        });
+      }
+    } catch (error) {
+      console.error('Analysis error:', error);
+      toast({
+        title: "Analysis Failed",
+        description: error instanceof Error ? error.message : "Failed to analyze clinical data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
     }
-    
-    setIsAnalyzing(false);
   };
 
   const handlePublish = async () => {
